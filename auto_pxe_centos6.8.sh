@@ -12,28 +12,16 @@ function stop_selinux_iptables(){
 
 # 检测有没有安装dhcp
 function check_dhcp(){
-	if [ `rpm -q dhcp` == "package dhcp is not installed" ]; then
-		yum -y install -q dhcp
-	elif [ `rpm -qa | grep dhcp | grep -v -E \(libs\|common\)` == `rpm -q dhcp` ]; then
-		echo "dhcp is already installed. "
-	fi
+	yum -y install -q dhcp &> /dev/null
 }
 
 # 检测有没有安装tftp
 function check_tftp(){	
-	if [ `rpm -q tftp` == "package tftp is not installed" ]; then
-		yum -y install -q tftp xinetd tftp-server syslinux
-	elif [ `rpm -qa | grep tftp` == `rpm -q tftp` ]; then
-		echo "tftp is already installed. "
-	fi
+	yum -y install -q tftp xinetd tftp-server syslinux &> /dev/null
 }
 
 function check_httpd(){	
-	if [ `rpm -q httpd` == "package httpd is not installed" ]; then
-		yum -y install -q httpd 
-	elif [ `rpm -qa httpd` == `rpm -q httpd` ]; then
-		echo "httpd is already installed. "
-	fi
+	yum -y install -q httpd &> /dev/null
 }
 
 # 检测dhcp的配置文件
@@ -44,20 +32,21 @@ function check_dhcp_cfg(){
 allow booting;
 allow bootp;
 
-subnet 192.168.137.0 netmask 255.255.255.0 {
-	range 192.168.137.50 192.168.137.70;
+subnet 192.168.0.0 netmask 255.255.255.0 {
+	range 192.168.0.50 192.168.0.70;
     option domain-name-servers ns1.internal.example.org;
 	option domain-name "internal.example.org";
-	option routers 192.168.137.1;
-  	option broadcast-address 192.168.137.255;
+	option routers 192.168.0.1;
+  	option broadcast-address 192.168.0.255;
     default-lease-time 600;
 	max-lease-time 7200;
- 	next-server 192.168.137.250;
+ 	next-server 192.168.0.250;
     filename "pxelinux.0";
 }
 EOF
 
-systemctl start dhcpd
+# systemctl start dhcpd
+/etc/init.d/dhcpd start
 
 RETVAL=$?
 
@@ -71,6 +60,7 @@ fi
 # 检测tftp的配置文件
 function check_tftp_cfg(){
 sed -i '/disable/s/yes/no/' /etc/xinetd.d/tftp
+cp -r /mnt/cdrom/isolinux/vesamenu.c32 /var/lib/tftpboot/
 cp -r /usr/share/syslinux/pxelinux.0 /var/lib/tftpboot
 mkdir /var/lib/tftpboot/pxelinux.cfg &> /dev/null
 touch /var/lib/tftpboot/pxelinux.cfg/default
@@ -88,7 +78,7 @@ menu title Community Enterprise operating system 6.8
 label linux
 	menu label ^Install Community Enterprise operating system 6.8 
 	kernel vmlinuz
-	append initrd=initrd.img ks=http://192.168.137.250/ks.cfg
+	append initrd=initrd.img ks=http://192.168.0.250/ks.cfg
 label local
     menu label Boot from ^local drive
     menu default
@@ -100,7 +90,7 @@ cp /mnt/cdrom/isolinux/initrd.img /var/lib/tftpboot
 cp /mnt/cdrom/isolinux/splash.jpg /var/lib/tftpboot
 cp /mnt/cdrom/isolinux/vmlinuz /var/lib/tftpboot
 
-systemctl start xinetd
+service xinetd restart
 }
 
 
@@ -157,13 +147,13 @@ EOF
 
 mkdir /var/www/html/dvd
 mount -o loop /home/iso/CentOS-6.8-x86_64-bin-DVD1.iso /var/www/html/dvd
-systemctl restart httpd
+service httpd restart
 
 }
 
 
 # 所有函数顺序执行
-function main(){
+function main_start(){
 	stop_selinux_iptables
 	check_dhcp	
 	check_tftp
@@ -173,4 +163,20 @@ function main(){
 	check_ks_cfg
 }
 
-main
+function main_stop() {
+	/etc/init.d/dhcpd stop
+	/etc/init.d/xinetd stop
+	/etc/init.d/httpd stop	
+}
+
+case "$1" in
+	main_start)
+		main_start
+	;;
+	main_stop)
+		main_stop
+	;;
+	*)
+		echo ""
+	;;
+esac
