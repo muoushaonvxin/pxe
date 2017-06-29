@@ -153,7 +153,7 @@ service httpd restart
 
 
 # 所有函数顺序执行
-function main_start(){
+function main_init() { 
 	stop_selinux_iptables
 	check_dhcp	
 	check_tftp
@@ -163,6 +163,12 @@ function main_start(){
 	check_ks_cfg
 }
 
+function main_start() {
+	/etc/init.d/dhcpd start
+	/etc/init.d/xinetd start
+	/etc/init.d/httpd start	
+}
+
 function main_stop() {
 	/etc/init.d/dhcpd stop
 	/etc/init.d/xinetd stop
@@ -170,6 +176,9 @@ function main_stop() {
 }
 
 case "$1" in
+	main_init)
+		main_init
+	;;
 	main_start)
 		main_start
 	;;
