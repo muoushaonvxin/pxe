@@ -5,23 +5,35 @@
 function stop_selinux_iptables(){
 	sed -i 's/SELINUX=enforcing/SELINUX=disable/' /etc/selinux/config
 	setenforce 0
-	# systemctl stop firewalld
-	# systemctl disable firewalld
+	systemctl stop firewalld
+	systemctl disable firewalld
 	service iptables stop	
 }
 
 # 检测有没有安装dhcp
 function check_dhcp(){
-	yum -y install -q dhcp &> /dev/null
+	if [ `rpm -q dhcp` == "package dhcp is not installed" ]; then
+		yum -y install -q dhcp
+	elif [ `rpm -qa | grep dhcp | grep -v -E \(libs\|common\)` == `rpm -q dhcp` ]; then
+		echo "dhcp is already installed. "
+	fi
 }
 
 # 检测有没有安装tftp
 function check_tftp(){	
-	yum -y install -q tftp xinetd tftp-server syslinux &> /dev/null
+	if [ `rpm -q tftp` == "package tftp is not installed" ]; then
+		yum -y install -q tftp xinetd tftp-server syslinux
+	elif [ `rpm -qa | grep tftp` == `rpm -q tftp` ]; then
+		echo "tftp is already installed. "
+	fi
 }
 
 function check_httpd(){	
-	yum -y install -q httpd &> /dev/null
+	if [ `rpm -q httpd` == "package httpd is not installed" ]; then
+		yum -y install -q httpd 
+	elif [ `rpm -qa httpd` == `rpm -q httpd` ]; then
+		echo "httpd is already installed. "
+	fi
 }
 
 # 检测dhcp的配置文件
@@ -33,7 +45,7 @@ allow booting;
 allow bootp;
 
 subnet 192.168.0.0 netmask 255.255.255.0 {
-	range 192.168.0.50 192.168.0.70;
+	range 192.168.0.10 192.168.0.50;
     option domain-name-servers ns1.internal.example.org;
 	option domain-name "internal.example.org";
 	option routers 192.168.0.1;
@@ -45,8 +57,7 @@ subnet 192.168.0.0 netmask 255.255.255.0 {
 }
 EOF
 
-# systemctl start dhcpd
-/etc/init.d/dhcpd start
+systemctl start dhcpd
 
 RETVAL=$?
 
@@ -60,7 +71,6 @@ fi
 # 检测tftp的配置文件
 function check_tftp_cfg(){
 sed -i '/disable/s/yes/no/' /etc/xinetd.d/tftp
-cp -r /mnt/cdrom/isolinux/vesamenu.c32 /var/lib/tftpboot/
 cp -r /usr/share/syslinux/pxelinux.0 /var/lib/tftpboot
 mkdir /var/lib/tftpboot/pxelinux.cfg &> /dev/null
 touch /var/lib/tftpboot/pxelinux.cfg/default
@@ -72,11 +82,11 @@ timeout 600
 
 display boot.msg
 menu clear
-menu background splash.jpg
+menu background splash.png
+menu title Red Hat Enterprise Linux 7.1 
 
-menu title Community Enterprise operating system 6.8 
 label linux
-	menu label ^Install Community Enterprise operating system 6.8 
+	menu label ^Install Red Hat Enterprise Linux 7.1 
 	kernel vmlinuz
 	append initrd=initrd.img ks=http://192.168.0.250/ks.cfg
 label local
@@ -85,70 +95,74 @@ label local
     localboot 0xffff
 EOF
 
-cp /mnt/cdrom/isolinux/boot.msg /var/lib/tftpboot
-cp /mnt/cdrom/isolinux/initrd.img /var/lib/tftpboot
-cp /mnt/cdrom/isolinux/splash.jpg /var/lib/tftpboot
-cp /mnt/cdrom/isolinux/vmlinuz /var/lib/tftpboot
+cp /mnt/rhel7.1/x86_64/dvd/isolinux/boot.msg /var/lib/tftpboot
+cp /mnt/rhel7.1/x86_64/dvd/isolinux/initrd.img /var/lib/tftpboot
+cp /mnt/rhel7.1/x86_64/dvd/isolinux/splash.png /var/lib/tftpboot
+cp /mnt/rhel7.1/x86_64/dvd/isolinux/vmlinuz /var/lib/tftpboot
 
-service xinetd restart
+systemctl start xinetd
 }
 
 
 function check_ks_cfg(){
 	cat > /var/www/html/ks.cfg << EOF
-#platform=x86, AMD64, or Intel EM64T
-#version=DEVEL
-# Firewall configuration
-	firewall --disabled
-# Install OS instead of upgrade
-	install
+#version=RHEL7
+# System authorization information
+	auth --enableshadow --passalgo=sha512
+# Reboot after installation
+	reboot
 # Use network installation
 	url --url="http://192.168.0.250/dvd/"
-# Root password
-	rootpw --plaintext 123456
-# System authorization information
-	auth  --useshadow  --passalgo=sha512
 # Use graphical install
-	graphical
+	text
+# Firewall configuration
+	firewall --enabled --service=ssh
 	firstboot --disable
-# System keyboard
-	keyboard us
+	ignoredisk --only-use=vda
+# Keyboard layouts
+# old format: keyboard us
+# new format:
+	keyboard --vckeymap=us --xlayouts='us'
 # System language
-	lang en_US
-# SELinux configuration
-	selinux --disabled
-# Installation logging level
-	logging --level=info
+	lang en_US.UTF-8
 
-# System timezone
-timezone  Asia/Shanghai
 # Network information
-network  --bootproto=dhcp --device=eth0 --onboot=on
+network  --bootproto=dhcp
+network  --hostname=zhangyz
+# Root password
+rootpw --plaintext redhat
+# SELinux configuration
+selinux --enforcing
+# System services
+services --disabled="kdump,rhsmcertd" --enabled="network,sshd,rsyslog,ovirt-guest-agent,chronyd"
+# System timezone
+timezone America/New_York --isUtc
 # System bootloader configuration
-bootloader --location=mbr
+bootloader --append="console=tty0 crashkernel=auto" --location=mbr --timeout=1 --boot-drive=vda
 # Clear the Master Boot Record
 zerombr
 # Partition clearing information
-clearpart --all  
+clearpart --all --initlabel 
 # Disk partitioning information
-part /boot --fstype="ext4" --size=200
-part / --fstype="ext4" --size=20000
-part swap --fstype="swap" --size=8192
+part / --fstype="xfs" --ondisk=vda --size=6144
+
+
+# workaround anaconda requirements
+%post
+useradd carol
+echo 123456 | passwd --stdin carol
+%end
 
 %packages
-@additional-devel
-@development
-git
-wget
 @core
 %end
 
 EOF
 
 mkdir /var/www/html/dvd &> /dev/null
-mkdir /home/iso &> /dev/null && wget 
-mount -o loop /home/iso/CentOS-6.8-x86_64-bin-DVD1.iso /var/www/html/dvd
-service httpd restart
+mkdir /home/iso &> /dev/null
+mount -o loop /home/iso/rhel7.1/x86_64/isos/rhel-server-7.1-x86_64-dvd.iso /var/www/html/dvd
+systemctl restart httpd
 
 }
 
@@ -165,7 +179,7 @@ function init_start(){
 }
 
 function start() {
-	mount -o loop /home/iso/CentOS-6.8-x86_64-bin-DVD1.iso /var/www/html/dvd &> /dev/null
+	mount -o loop /home/iso/rhel7.1/x86_64/isos/rhel-server-7.1-x86_64-dvd.iso /var/www/html/dvd &> /dev/null
 	/etc/init.d/dhcpd start &> /dev/null
 	/etc/init.d/xinetd start &> dev/null
 	/etc/init.d/httpd start &> /dev/null
@@ -192,3 +206,4 @@ case "$1" in
 		echo "Usage: `basename $0` { init_start | start | stop }."
 	;;
 esac
+
