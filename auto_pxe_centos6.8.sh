@@ -154,7 +154,11 @@ service httpd restart
 
 
 # 所有函数顺序执行
+<<<<<<< HEAD
 function init_start(){
+=======
+function main_init() { 
+>>>>>>> 482729e2d4644b750417dc51ea944b8ee0b08dde
 	stop_selinux_iptables
 	check_dhcp	
 	check_tftp
@@ -164,6 +168,7 @@ function init_start(){
 	check_ks_cfg
 }
 
+<<<<<<< HEAD
 function start() {
 	mount -o loop /home/iso/CentOS-6.8-x86_64-bin-DVD1.iso /var/www/html/dvd &> /dev/null
 	/etc/init.d/dhcpd start &> /dev/null
@@ -184,6 +189,26 @@ case "$1" in
 	;;
 	start)
 		start
+=======
+function main_start() {
+	/etc/init.d/dhcpd start
+	/etc/init.d/xinetd start
+	/etc/init.d/httpd start	
+}
+
+function main_stop() {
+	/etc/init.d/dhcpd stop
+	/etc/init.d/xinetd stop
+	/etc/init.d/httpd stop	
+}
+
+case "$1" in
+	main_init)
+		main_init
+	;;
+	main_start)
+		main_start
+>>>>>>> 482729e2d4644b750417dc51ea944b8ee0b08dde
 	;;
 	stop)
 		stop
