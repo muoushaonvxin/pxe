@@ -152,10 +152,6 @@ service httpd restart
 
 }
 
-
-# 所有函数顺序执行
-function init_start(){
-
 function main_init() { 
 	stop_selinux_iptables
 	check_dhcp	
@@ -187,7 +183,7 @@ case "$1" in
 		main_start
 	;;
 	stop)
-		stop
+		main_stop
 	;;
 	*)
 		echo "Usage: `basename $0` { init | start | stop }."
