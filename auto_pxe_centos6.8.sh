@@ -154,11 +154,9 @@ service httpd restart
 
 
 # 所有函数顺序执行
-<<<<<<< HEAD
 function init_start(){
-=======
+
 function main_init() { 
->>>>>>> 482729e2d4644b750417dc51ea944b8ee0b08dde
 	stop_selinux_iptables
 	check_dhcp	
 	check_tftp
@@ -168,28 +166,6 @@ function main_init() {
 	check_ks_cfg
 }
 
-<<<<<<< HEAD
-function start() {
-	mount -o loop /home/iso/CentOS-6.8-x86_64-bin-DVD1.iso /var/www/html/dvd &> /dev/null
-	/etc/init.d/dhcpd start &> /dev/null
-	/etc/init.d/xinetd start &> dev/null
-	/etc/init.d/httpd start &> /dev/null
-}
-
-function stop() {
-	umount /var/www/html/dvd &> /dev/null
-	/etc/init.d/dhcpd stop &> /dev/null
-	/etc/init.d/xinetd stop &> /dev/null
-	/etc/init.d/httpd stop &> /dev/null	
-}
-
-case "$1" in
-	init_start)
-		init_start
-	;;
-	start)
-		start
-=======
 function main_start() {
 	/etc/init.d/dhcpd start
 	/etc/init.d/xinetd start
@@ -202,18 +178,18 @@ function main_stop() {
 	/etc/init.d/httpd stop	
 }
 
+
 case "$1" in
-	main_init)
+	init)
 		main_init
 	;;
-	main_start)
+	start)
 		main_start
->>>>>>> 482729e2d4644b750417dc51ea944b8ee0b08dde
 	;;
 	stop)
 		stop
 	;;
 	*)
-		echo "Usage: `basename $0` { init_start | start | stop }."
+		echo "Usage: `basename $0` { init | start | stop }."
 	;;
 esac
